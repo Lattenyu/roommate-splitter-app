@@ -1,2 +1,4 @@
-# Card-Sorter-Project
-Scanning API.
+# Roommate-Splitter-Expense-App
+Gui
+Function
+

@@ -1,6 +1,6 @@
-package SplitterAppGui;
+package SplitterApp;
 
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
 public class AppLauncher {
     public static void main(String[] args) {

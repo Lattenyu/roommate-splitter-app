@@ -1,184 +1,456 @@
-package SplitterAppGui;
+package SplitterApp;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+//import java.awt.event.ActionEvent;
+//import java.awt.event.ActionListener;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 
 public class SplitterAppGui extends JFrame {
-    private List<Bill> bills = new ArrayList<>();
-    private DefaultTableModel tableModel;
-    private JTable billTable;
-    private String currentUser = "alice@example.com"; // Simulated logged-in user
+    private static final String[] QUOTES = {
+        "Split the bill, not the friendship!",
+        "In pizza we crust, in bills we split!",
+        "Pay up or walk the plank!",
+        "Because no one should cry over spilt milk... or bills!",
+        "Friends don't let friends overpay!",
+        "Divide the bill, conquer the awkwardness!",
+        "Bills split faster than a banana in a smoothie!"
+    };
+
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+    private JPanel groupsListPanel;
+    private Map<String, Group> groups;
 
     public SplitterAppGui() {
         super("Roommate Splitter Expense App");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(450, 650);
+        setSize(650, 850);
         setLocationRelativeTo(null);
         setResizable(false);
-        setLayout(null);
 
-        // Create Bill Form
-        JLabel nameLabel = new JLabel("Bill Name:");
-        nameLabel.setBounds(20, 20, 100, 25);
-        add(nameLabel);
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+        groups = new HashMap<>();
 
+        mainPanel.add(createStartPanel(), "start");
+        mainPanel.add(createMenuPanel(), "main");
+
+        setContentPane(mainPanel);
+        cardLayout.show(mainPanel, "start");
+    }
+
+    private JPanel createStartPanel() {
+        JPanel startPanel = new JPanel();
+        startPanel.setLayout(null);
+        startPanel.setBackground(Color.BLACK);
+    
+        // Random quote label
+        Random random = new Random();
+        String randomQuote = QUOTES[random.nextInt(QUOTES.length)];
+        JLabel quoteLabel = new JLabel("<html><center>" + randomQuote + "</center></html>");
+        quoteLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        quoteLabel.setForeground(Color.WHITE);
+        quoteLabel.setBounds(190, 300, 300, 100); 
+        startPanel.add(quoteLabel, BorderLayout.CENTER);
+
+        JButton letsGoButton = new JButton("Let's Go!");
+        letsGoButton.setFont(new Font("Arial", Font.PLAIN, 18));
+        letsGoButton.setBackground(new Color(50, 205, 50));
+        letsGoButton.setForeground(Color.BLACK);
+        letsGoButton.setFocusPainted(false);
+        letsGoButton.setBounds(290, 400, 100, 50); 
+        letsGoButton.addActionListener(e -> cardLayout.show(mainPanel, "main"));
+        startPanel.add(letsGoButton);
+    
+        return startPanel;
+    }
+
+    private JPanel createMenuPanel() {
+        JPanel menuPanel = new JPanel();
+        menuPanel.setLayout(new BorderLayout());
+        menuPanel.setBackground(Color.BLACK);
+
+        JLabel titleLabel = new JLabel("Roommate Splitter Expense App", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+        menuPanel.add(titleLabel, BorderLayout.NORTH);
+
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        contentPanel.setBackground(Color.BLACK);
+
+        JLabel groupLabel = new JLabel("Your Groups", SwingConstants.CENTER);
+        groupLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        groupLabel.setForeground(Color.WHITE);
+        groupLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        contentPanel.add(groupLabel, BorderLayout.NORTH);
+
+        groupsListPanel = new JPanel();
+        groupsListPanel.setLayout(new BoxLayout(groupsListPanel, BoxLayout.Y_AXIS));
+        groupsListPanel.setBackground(Color.BLACK);
+
+        JScrollPane scrollPane = new JScrollPane(groupsListPanel);
+        scrollPane.getViewport().setBackground(Color.BLACK);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        contentPanel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(Color.BLACK);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 20, 0));
+
+        JButton createGroupButton = new JButton("Create Group");
+        styleButton(createGroupButton);
+        createGroupButton.addActionListener(e -> showCreateGroupDialog());
+        buttonPanel.add(createGroupButton);
+
+        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        menuPanel.add(contentPanel, BorderLayout.CENTER);
+
+        updateGroupsList();
+
+        return menuPanel;
+    }
+
+    private void updateGroupsList() {
+        groupsListPanel.removeAll();
+
+        if (groups.isEmpty()) {
+            JLabel noGroupsLabel = new JLabel("No groups yet. Create one!", SwingConstants.CENTER);
+            noGroupsLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+            noGroupsLabel.setForeground(Color.WHITE);
+            noGroupsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            groupsListPanel.add(noGroupsLabel);
+        } else {
+            for (String groupName : groups.keySet()) {
+                JButton groupButton = new JButton(groupName);
+                styleButton(groupButton);
+                groupButton.addActionListener(e -> showGroupDetails(groupName));
+                groupButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+                groupsListPanel.add(groupButton);
+                groupsListPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+            }
+        }
+
+        groupsListPanel.revalidate();
+        groupsListPanel.repaint();
+    }
+
+    private void showGroupDetails(String groupName) {
+        Group group = groups.get(groupName);
+
+        JPanel groupPanel = new JPanel();
+        groupPanel.setLayout(new BorderLayout());
+        groupPanel.setBackground(Color.BLACK);
+
+        JLabel titleLabel = new JLabel(groupName, SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+        groupPanel.add(titleLabel, BorderLayout.NORTH);
+
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        contentPanel.setBackground(Color.BLACK);
+
+        // Expenses list
+        JPanel expensesPanel = new JPanel();
+        expensesPanel.setLayout(new BoxLayout(expensesPanel, BoxLayout.Y_AXIS)); 
+        expensesPanel.setBackground(Color.BLACK);
+
+        JLabel expensesLabel = new JLabel("Expenses");
+        expensesLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        expensesLabel.setForeground(Color.WHITE);
+        expensesLabel.setAlignmentX(Component.CENTER_ALIGNMENT); 
+        expensesPanel.add(expensesLabel);
+
+        List<Expense> expenses = group.getExpenseManager().getExpenses();
+        if (expenses.isEmpty()) {
+            JLabel noExpensesLabel = new JLabel("No expenses yet.");
+            noExpensesLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+            noExpensesLabel.setForeground(Color.WHITE);
+            noExpensesLabel.setAlignmentX(Component.CENTER_ALIGNMENT); 
+            expensesPanel.add(noExpensesLabel);
+        } else {
+            for (Expense expense : expenses) {
+                JLabel expenseLabel = new JLabel(
+                    expense.getDescription() + ": $" + String.format("%.2f", expense.getAmount()) +
+                    " (Paid by " + expense.getPayer().getName() + ")"
+                );
+                expenseLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+                expenseLabel.setForeground(Color.WHITE);
+                expenseLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+                expensesPanel.add(expenseLabel);
+            }
+        }
+
+        JScrollPane expensesScrollPane = new JScrollPane(expensesPanel);
+        expensesScrollPane.getViewport().setBackground(Color.BLACK);
+        expensesScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        contentPanel.add(expensesScrollPane, BorderLayout.CENTER);
+
+        // Splits
+        JPanel splitsPanel = new JPanel();
+        splitsPanel.setLayout(new BoxLayout(splitsPanel, BoxLayout.Y_AXIS));
+        splitsPanel.setBackground(Color.BLACK);
+
+        JLabel splitsLabel = new JLabel("Splits");
+        splitsLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        splitsLabel.setForeground(Color.WHITE);
+        splitsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        splitsPanel.add(splitsLabel);
+
+        List<Split> splits = group.getExpenseManager().calculateSplits();
+        for (Split split : splits) {
+            JLabel splitLabel = new JLabel(split.toString());
+            splitLabel.setFont(new Font("Arial", Font.PLAIN, 14));
+            splitLabel.setForeground(Color.WHITE);
+            splitLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            splitsPanel.add(splitLabel);
+        }
+
+        JScrollPane splitsScrollPane = new JScrollPane(splitsPanel);
+        splitsScrollPane.getViewport().setBackground(Color.BLACK);
+        splitsScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        contentPanel.add(splitsScrollPane, BorderLayout.SOUTH);
+
+        // Buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(Color.BLACK);
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 20, 0));
+
+        JButton createExpenseButton = new JButton("Add Expense");
+        styleButton(createExpenseButton);
+        createExpenseButton.addActionListener(e -> showCreateExpenseDialog(group));
+        buttonPanel.add(createExpenseButton);
+
+        JButton backButton = new JButton("Back to Main");
+        styleButton(backButton);
+        backButton.addActionListener(e -> cardLayout.show(mainPanel, "main"));
+        buttonPanel.add(backButton);
+
+        groupPanel.add(contentPanel, BorderLayout.CENTER);
+        groupPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        mainPanel.add(groupPanel, "group_" + groupName);
+        cardLayout.show(mainPanel, "group_" + groupName);
+    }
+
+    private void showCreateGroupDialog() {
+        JDialog dialog = new JDialog(this, "Create New Group", true);
+        dialog.setSize(350, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout(4, 1, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel nameLabel = new JLabel("Group Name:");
         JTextField nameField = new JTextField();
-        nameField.setBounds(120, 20, 300, 25);
-        add(nameField);
 
-        JLabel amountLabel = new JLabel("Total Amount:");
-        amountLabel.setBounds(20, 50, 100, 25);
-        add(amountLabel);
+        JLabel countLabel = new JLabel("Number of People:");
+        JTextField countField = new JTextField();
 
-        JTextField amountField = new JTextField();
-        amountField.setBounds(120, 50, 300, 25);
-        add(amountField);
+        panel.add(nameLabel);
+        panel.add(nameField);
+        panel.add(countLabel);
+        panel.add(countField);
 
-        JLabel splitLabel = new JLabel("Split (email:amount):");
-        splitLabel.setBounds(20, 80, 150, 25);
-        add(splitLabel);
+        JPanel namesPanel = new JPanel();
+        namesPanel.setLayout(new BoxLayout(namesPanel, BoxLayout.Y_AXIS));
+        JScrollPane scrollPane = new JScrollPane(namesPanel);
+        scrollPane.setPreferredSize(new Dimension(300, 150));
 
-        JTextField splitField = new JTextField("alice@example.com:0,bob@example.com:0");
-        splitField.setBounds(170, 80, 250, 25);
-        add(splitField);
+        JButton nextButton = new JButton("Next");
+        nextButton.addActionListener(e -> {
+            String groupName = nameField.getText().trim();
+            String countText = countField.getText().trim();
 
-        JButton createButton = new JButton("Create Bill");
-        createButton.setBounds(20, 110, 400, 30);
-        add(createButton);
+            if (groupName.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, 
+                    "Group name cannot be empty!", 
+                    "Error", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
 
-        // Bill Table
-        String[] columns = {"ID", "Name", "Amount", "Creator", "Actions"};
-        tableModel = new DefaultTableModel(columns, 0);
-        billTable = new JTable(tableModel);
-        JScrollPane scrollPane = new JScrollPane(billTable);
-        scrollPane.setBounds(20, 150, 400, 400);
-        add(scrollPane);
+            int numPeople;
+            try {
+                numPeople = Integer.parseInt(countText);
+                if (numPeople <= 1) {
+                    throw new NumberFormatException();
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, 
+                    "Please enter a valid number (2 or more)!", 
+                    "Error", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
 
-        // Create Bill Action
-        createButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                try {
-                    String name = nameField.getText();
-                    double amount = Double.parseDouble(amountField.getText());
-                    String[] splits = splitField.getText().split(",");
+            namesPanel.removeAll();
+            for (int i = 0; i < numPeople; i++) {
+                JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+                rowPanel.add(new JLabel("Person " + (i + 1) + ":"));
+                rowPanel.add(new JTextField(15));
+                namesPanel.add(rowPanel);
+            }
 
-                    // Create bill
-                    String billId = UUID.randomUUID().toString();
-                    Bill bill = new Bill(billId, name, amount, currentUser);
+            namesPanel.revalidate();
+            namesPanel.repaint();
+            dialog.getContentPane().remove(panel);
+            dialog.getContentPane().add(scrollPane, BorderLayout.CENTER);
+            dialog.getContentPane().add(createDialogButtonPanel(dialog, nameField, namesPanel), BorderLayout.SOUTH);
+            dialog.pack();
+        });
 
-                    // Parse splits
-                    for (String split : splits) {
-                        String[] parts = split.split(":");
-                        if (parts.length == 2) {
-                            String user = parts[0].trim();
-                            double splitAmount = Double.parseDouble(parts[1].trim());
-                            bill.addSplit(user, splitAmount);
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(nextButton);
+
+        dialog.getContentPane().add(panel, BorderLayout.CENTER);
+        dialog.getContentPane().add(buttonPanel, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+
+private JPanel createDialogButtonPanel(JDialog dialog, JTextField nameField, JPanel namesPanel) {
+    JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+    JButton createButton = new JButton("Create");
+    createButton.addActionListener(e -> {
+        String groupName = nameField.getText().trim();
+        if (groupName.isEmpty()) {
+            JOptionPane.showMessageDialog(dialog, "Please enter a group name", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Collect member names and check for duplicates
+        List<String> members = new ArrayList<>();
+        Set<String> uniqueNames = new HashSet<>(); // To track unique names
+        for (Component comp : namesPanel.getComponents()) {
+            if (comp instanceof JPanel) {
+                JPanel rowPanel = (JPanel) comp;
+                for (Component fieldComp : rowPanel.getComponents()) {
+                    if (fieldComp instanceof JTextField) {
+                        String name = ((JTextField) fieldComp).getText().trim();
+                        if (!name.isEmpty()) {
+                            if (!uniqueNames.add(name)) { // Duplicate found
+                                JOptionPane.showMessageDialog(dialog, 
+                                    "Duplicate name detected: '" + name + "'. Names must be unique.", 
+                                    "Error", 
+                                    JOptionPane.ERROR_MESSAGE);
+                                return;
+                            }
+                            members.add(name);
                         }
                     }
-
-                    // Add to list and table
-                    bills.add(bill);
-                    JButton viewButton = new JButton("View");
-                    JButton editButton = bill.getCreator().equals(currentUser) ? new JButton("Edit") : null;
-
-                    // Add row to table
-                    Object[] row = {
-                        bill.getId(),
-                        bill.getName(),
-                        bill.getTotalAmount(),
-                        bill.getCreator(),
-                        bill.getCreator().equals(currentUser) ? new JPanel() {{ add(viewButton); add(editButton); }} : new JPanel() {{ add(viewButton); }}
-                    };
-                    tableModel.addRow(row);
-
-                    // View Bill Action
-                    viewButton.addActionListener(ev -> {
-                        JOptionPane.showMessageDialog(null, formatBillDetails(bill), "Bill Details", JOptionPane.INFORMATION_MESSAGE);
-                    });
-
-                    // Edit Bill Action (only for creator)
-                    if (editButton != null) {
-                        editButton.addActionListener(ev -> {
-                            JTextField editNameField = new JTextField(bill.getName());
-                            JTextField editAmountField = new JTextField(String.valueOf(bill.getTotalAmount()));
-                            Object[] message = {
-                                "Bill Name:", editNameField,
-                                "Total Amount:", editAmountField
-                            };
-                            int option = JOptionPane.showConfirmDialog(null, message, "Edit Bill", JOptionPane.OK_CANCEL_OPTION);
-                            if (option == JOptionPane.OK_OPTION) {
-                                bill = new Bill(bill.getId(), editNameField.getText(), Double.parseDouble(editAmountField.getText()), bill.getCreator());
-                                bills.set(bills.indexOf(bill), bill);
-                                refreshTable();
-                            }
-                        });
-                    }
-
-                    // Clear form
-                    nameField.setText("");
-                    amountField.setText("");
-                    splitField.setText("alice@example.com:0,bob@example.com:0");
-                } catch (NumberFormatException ex) {
-                    JOptionPane.showMessageDialog(null, "Invalid amount or split format!", "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
-        });
-    }
-
-    private String formatBillDetails(Bill bill) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Bill: ").append(bill.getName()).append("\n");
-        sb.append("Total Amount: $").append(bill.getTotalAmount()).append("\n");
-        sb.append("Creator: ").append(bill.getCreator()).append("\n");
-        sb.append("Splits:\n");
-        for (Map.Entry<String, Double> split : bill.getSplits().entrySet()) {
-            sb.append("  ").append(split.getKey()).append(": $").append(split.getValue()).append("\n");
         }
-        return sb.toString();
-    }
 
-    private void refreshTable() {
-        tableModel.setRowCount(0);
-        for (Bill bill : bills) {
-            JButton viewButton = new JButton("View");
-            JButton editButton = bill.getCreator().equals(currentUser) ? new JButton("Edit") : null;
+        if (members.size() < 2) {
+            JOptionPane.showMessageDialog(dialog, "Group must have at least 2 members", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
-            Object[] row = {
-                bill.getId(),
-                bill.getName(),
-                bill.getTotalAmount(),
-                bill.getCreator(),
-                bill.getCreator().equals(currentUser) ? new JPanel() {{ add(viewButton); add(editButton); }} : new JPanel() {{ add(viewButton); }}
-            };
-            tableModel.addRow(row);
+        groups.put(groupName, new Group(groupName, members));
+        updateGroupsList();
+        dialog.dispose();
+    });
 
-            viewButton.addActionListener(ev -> {
-                JOptionPane.showMessageDialog(null, formatBillDetails(bill), "Bill Details", JOptionPane.INFORMATION_MESSAGE);
-            });
+    JButton cancelButton = new JButton("Cancel");
+    cancelButton.addActionListener(e -> dialog.dispose());
 
-            if (editButton != null) {
-                editButton.addActionListener(ev -> {
-                    JTextField editNameField = new JTextField(bill.getName());
-                    JTextField editAmountField = new JTextField(String.valueOf(bill.getTotalAmount()));
-                    Object[] message = {
-                        "Bill Name:", editNameField,
-                        "Total Amount:", editAmountField
-                    };
-                    int option = JOptionPane.showConfirmDialog(null, message, "Edit Bill", JOptionPane.OK_CANCEL_OPTION);
-                    if (option == JOptionPane.OK_OPTION) {
-                        Bill updatedBill = new Bill(bill.getId(), editNameField.getText(), Double.parseDouble(editAmountField.getText()), bill.getCreator());
-                        bills.set(bills.indexOf(bill), updatedBill);
-                        refreshTable();
-                    }
-                });
+    buttonPanel.add(cancelButton);
+    buttonPanel.add(createButton);
+
+    return buttonPanel;
+}
+
+    private void showCreateExpenseDialog(Group group) {
+        JDialog dialog = new JDialog(this, "Add New Expense", true);
+        dialog.setSize(400, 400);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout(5, 1, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel nameLabel = new JLabel("Expense Name:");
+        JTextField nameField = new JTextField();
+
+        JLabel amountLabel = new JLabel("Total Amount:");
+        JTextField amountField = new JTextField();
+
+        JLabel payerLabel = new JLabel("Paid By:");
+        JComboBox<String> payerComboBox = new JComboBox<>(group.getMembers().toArray(new String[0]));
+
+        panel.add(nameLabel);
+        panel.add(nameField);
+        panel.add(amountLabel);
+        panel.add(amountField);
+        panel.add(payerLabel);
+        panel.add(payerComboBox);
+
+        JButton createButton = new JButton("Add Expense");
+        createButton.addActionListener(e -> {
+            String expenseName = nameField.getText().trim();
+            if (expenseName.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Please enter an expense name", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
             }
-        }
+
+            double amount;
+            try {
+                amount = Double.parseDouble(amountField.getText().trim());
+                if (amount <= 0) {
+                    throw new NumberFormatException();
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "Please enter a valid positive amount", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            String payerName = (String) payerComboBox.getSelectedItem();
+            Roommate payer = group.getExpenseManager().findRoommateByName(payerName);
+            if (payer == null) {
+                JOptionPane.showMessageDialog(dialog, "Invalid payer selected", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            group.getExpenseManager().addExpense(expenseName, amount, payer);
+            JOptionPane.showMessageDialog(dialog, "Expense added successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            dialog.dispose();
+            showGroupDetails(group.getName()); // Refresh group details
+        });
+
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(createButton);
+
+        dialog.getContentPane().add(panel, BorderLayout.CENTER);
+        dialog.getContentPane().add(buttonPanel, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+
+    private void styleButton(JButton button) {
+        button.setFont(new Font("Arial", Font.PLAIN, 18));
+        button.setBackground(new Color(70, 130, 180));
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setPreferredSize(new Dimension(250, 50));
+        button.setMinimumSize(new Dimension(250, 50));
+        button.setMaximumSize(new Dimension(250, 50));
+        button.setAlignmentX(Component.CENTER_ALIGNMENT);
     }
 }
