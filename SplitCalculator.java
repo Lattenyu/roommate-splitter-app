@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+//Calculator itself
+
 public class SplitCalculator {
     public static List<Split> calculateSplits(List<Roommate> roommates, List<Expense> expenses) {
         if (roommates.isEmpty()) {

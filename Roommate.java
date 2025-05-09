@@ -1,4 +1,5 @@
 package SplitterApp;
+//Create a identification for the roommate
 
 public class Roommate {
     private int id;

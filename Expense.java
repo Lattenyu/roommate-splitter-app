@@ -1,9 +1,9 @@
 package SplitterApp;
-
+// Keeps track of the expense such as who payed and what is the total amount. 
 import java.time.LocalDate;
 
 public class Expense {
-    private int id;
+    private int id; 
     private String description;
     private double amount;
     private Roommate payer;

@@ -2,15 +2,8 @@ package SplitterApp;
 
 import javax.swing.*;
 import java.awt.*;
-//import java.awt.event.ActionEvent;
-//import java.awt.event.ActionListener;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
 
 public class SplitterAppGui extends JFrame {
     private static final String[] QUOTES = {
@@ -25,8 +18,7 @@ public class SplitterAppGui extends JFrame {
 
     private CardLayout cardLayout;
     private JPanel mainPanel;
-    private JPanel groupsListPanel;
-    private Map<String, Group> groups;
+    private Group group; // Single group instance
 
     public SplitterAppGui() {
         super("Roommate Splitter Expense App");
@@ -37,15 +29,15 @@ public class SplitterAppGui extends JFrame {
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
-        groups = new HashMap<>();
+        group = null; // No group initially
 
         mainPanel.add(createStartPanel(), "start");
-        mainPanel.add(createMenuPanel(), "main");
 
         setContentPane(mainPanel);
         cardLayout.show(mainPanel, "start");
     }
 
+    // First page where it shows a funny quote and a button to go to the group creation dialog
     private JPanel createStartPanel() {
         JPanel startPanel = new JPanel();
         startPanel.setLayout(null);
@@ -66,91 +58,180 @@ public class SplitterAppGui extends JFrame {
         letsGoButton.setForeground(Color.BLACK);
         letsGoButton.setFocusPainted(false);
         letsGoButton.setBounds(290, 400, 100, 50); 
-        letsGoButton.addActionListener(e -> cardLayout.show(mainPanel, "main"));
+        letsGoButton.addActionListener(e -> showCreateGroupDialog());
         startPanel.add(letsGoButton);
     
         return startPanel;
     }
 
-    private JPanel createMenuPanel() {
-        JPanel menuPanel = new JPanel();
-        menuPanel.setLayout(new BorderLayout());
-        menuPanel.setBackground(Color.BLACK);
+    // Creating or editing group
+    private void showCreateGroupDialog() {
+        JDialog dialog = new JDialog(this, group == null ? "Create New Group" : "Edit Group", true);
+        dialog.setSize(350, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new BorderLayout());
 
-        JLabel titleLabel = new JLabel("Roommate Splitter Expense App", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        titleLabel.setForeground(Color.WHITE);
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
-        menuPanel.add(titleLabel, BorderLayout.NORTH);
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout(4, 1, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        JPanel contentPanel = new JPanel(new BorderLayout());
-        contentPanel.setBackground(Color.BLACK);
-
-        JLabel groupLabel = new JLabel("Your Groups", SwingConstants.CENTER);
-        groupLabel.setFont(new Font("Arial", Font.BOLD, 20));
-        groupLabel.setForeground(Color.WHITE);
-        groupLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-        contentPanel.add(groupLabel, BorderLayout.NORTH);
-
-        groupsListPanel = new JPanel();
-        groupsListPanel.setLayout(new BoxLayout(groupsListPanel, BoxLayout.Y_AXIS));
-        groupsListPanel.setBackground(Color.BLACK);
-
-        JScrollPane scrollPane = new JScrollPane(groupsListPanel);
-        scrollPane.getViewport().setBackground(Color.BLACK);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        contentPanel.add(scrollPane, BorderLayout.CENTER);
-
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        buttonPanel.setBackground(Color.BLACK);
-        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 20, 0));
-
-        JButton createGroupButton = new JButton("Create Group");
-        styleButton(createGroupButton);
-        createGroupButton.addActionListener(e -> showCreateGroupDialog());
-        buttonPanel.add(createGroupButton);
-
-        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
-
-        menuPanel.add(contentPanel, BorderLayout.CENTER);
-
-        updateGroupsList();
-
-        return menuPanel;
-    }
-
-    private void updateGroupsList() {
-        groupsListPanel.removeAll();
-
-        if (groups.isEmpty()) {
-            JLabel noGroupsLabel = new JLabel("No groups yet. Create one!", SwingConstants.CENTER);
-            noGroupsLabel.setFont(new Font("Arial", Font.PLAIN, 16));
-            noGroupsLabel.setForeground(Color.WHITE);
-            noGroupsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-            groupsListPanel.add(noGroupsLabel);
-        } else {
-            for (String groupName : groups.keySet()) {
-                JButton groupButton = new JButton(groupName);
-                styleButton(groupButton);
-                groupButton.addActionListener(e -> showGroupDetails(groupName));
-                groupButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-                groupsListPanel.add(groupButton);
-                groupsListPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-            }
+        JLabel nameLabel = new JLabel("Group Name:");
+        JTextField nameField = new JTextField();
+        if (group != null) {
+            nameField.setText(group.getName()); // Pre-fill group name if editing
         }
 
-        groupsListPanel.revalidate();
-        groupsListPanel.repaint();
+        JLabel countLabel = new JLabel("Number of Roommates:");
+        JTextField countField = new JTextField();
+        if (group != null) {
+            countField.setText(String.valueOf(group.getMembers().size())); // Pre-fill number of roommates
+        }
+
+        panel.add(nameLabel);
+        panel.add(nameField);
+        panel.add(countLabel);
+        panel.add(countField);
+
+        JPanel namesPanel = new JPanel(); 
+        namesPanel.setLayout(new BoxLayout(namesPanel, BoxLayout.Y_AXIS));
+        JScrollPane scrollPane = new JScrollPane(namesPanel);
+        scrollPane.setPreferredSize(new Dimension(300, 150));
+
+        JButton nextButton = new JButton("Next");
+        nextButton.addActionListener(e -> {
+            String groupName = nameField.getText().trim(); 
+            String countText = countField.getText().trim();
+
+            if (groupName.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, 
+                    "Group name cannot be empty!", 
+                    "Error", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            int numPeople;
+            try {
+                numPeople = Integer.parseInt(countText);
+                if (numPeople <= 1) {
+                    throw new NumberFormatException();
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, 
+                    "Please enter a valid number (2 or more)!", 
+                    "Error", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Set name fields for each roommate
+            namesPanel.removeAll();
+            List<String> existingMembers = (group != null) ? group.getMembers() : new ArrayList<>();
+            for (int i = 0; i < numPeople; i++) {
+                JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+                rowPanel.add(new JLabel("Person " + (i + 1) + ":"));
+                JTextField nameTextField = new JTextField(15);
+                // Pre-fill existing member names if available
+                if (i < existingMembers.size()) {
+                    nameTextField.setText(existingMembers.get(i));
+                }
+                rowPanel.add(nameTextField);
+                namesPanel.add(rowPanel);
+            }
+
+            namesPanel.revalidate();
+            namesPanel.repaint();
+            dialog.getContentPane().remove(panel);
+            dialog.getContentPane().add(scrollPane, BorderLayout.CENTER);
+            dialog.getContentPane().add(createDialogButtonPanel(dialog, nameField, namesPanel), BorderLayout.SOUTH);
+            dialog.pack();
+        });
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(nextButton); 
+
+        dialog.getContentPane().add(panel, BorderLayout.CENTER);
+        dialog.getContentPane().add(buttonPanel, BorderLayout.SOUTH);
+        dialog.setVisible(true);
     }
 
-    private void showGroupDetails(String groupName) {
-        Group group = groups.get(groupName);
+    // Create or update the group
+    private JPanel createDialogButtonPanel(JDialog dialog, JTextField nameField, JPanel namesPanel) {
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        JButton createButton = new JButton(group == null ? "Create" : "Update");
+        createButton.addActionListener(e -> {
+            String groupName = nameField.getText().trim();
+            if (groupName.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Please enter a group name", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Collect member names and check for duplicates
+            List<String> members = new ArrayList<>();
+            Set<String> uniqueNames = new HashSet<>();
+            for (Component comp : namesPanel.getComponents()) {
+                if (comp instanceof JPanel) {
+                    JPanel rowPanel = (JPanel) comp;
+                    for (Component fieldComp : rowPanel.getComponents()) {
+                        if (fieldComp instanceof JTextField) {
+                            String name = ((JTextField) fieldComp).getText().trim();
+                            if (!name.isEmpty()) {
+                                if (!uniqueNames.add(name)) {
+                                    JOptionPane.showMessageDialog(dialog, 
+                                        "Duplicate name detected: '" + name + "'. Names must be unique.", 
+                                        "Error", 
+                                        JOptionPane.ERROR_MESSAGE);
+                                    return;
+                                }
+                                members.add(name);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (members.size() < 2) {
+                JOptionPane.showMessageDialog(dialog, "Group must have at least 2 members", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Preserve expenses if editing
+            List<Expense> existingExpenses = (group != null) ? group.getExpenseManager().getExpenses() : new ArrayList<>();
+            group = new Group(groupName, members); // Create or update group
+            // Re-add existing expenses to the new ExpenseManager
+            for (Expense expense : existingExpenses) {
+                Roommate payer = group.getExpenseManager().findRoommateByName(expense.getPayer().getName());
+                if (payer != null) {
+                    group.getExpenseManager().addExpense(expense.getDescription(), expense.getAmount(), payer);
+                }
+            }
+
+            dialog.dispose();
+            showGroupDetails(); // Show updated group details
+        });
+
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(createButton);
+
+        return buttonPanel;
+    }
+
+    // Group details such as who owes or owed who, how much does each need to pay etc.
+    private void showGroupDetails() {
+        if (group == null) {
+            showCreateGroupDialog(); // Fallback to creation if no group exists
+            return;
+        }
 
         JPanel groupPanel = new JPanel();
         groupPanel.setLayout(new BorderLayout());
         groupPanel.setBackground(Color.BLACK);
 
-        JLabel titleLabel = new JLabel(groupName, SwingConstants.CENTER);
+        JLabel titleLabel = new JLabel(group.getName(), SwingConstants.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
         titleLabel.setForeground(Color.WHITE);
         titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
@@ -227,153 +308,28 @@ public class SplitterAppGui extends JFrame {
 
         JButton createExpenseButton = new JButton("Add Expense");
         styleButton(createExpenseButton);
-        createExpenseButton.addActionListener(e -> showCreateExpenseDialog(group));
+        createExpenseButton.addActionListener(e -> showCreateExpenseDialog());
         buttonPanel.add(createExpenseButton);
 
-        JButton backButton = new JButton("Back to Main");
-        styleButton(backButton);
-        backButton.addActionListener(e -> cardLayout.show(mainPanel, "main"));
-        buttonPanel.add(backButton);
+        JButton editGroupButton = new JButton("Edit Group");
+        styleButton(editGroupButton);
+        editGroupButton.addActionListener(e -> showCreateGroupDialog());
+        buttonPanel.add(editGroupButton);
 
         groupPanel.add(contentPanel, BorderLayout.CENTER);
         groupPanel.add(buttonPanel, BorderLayout.SOUTH);
 
-        mainPanel.add(groupPanel, "group_" + groupName);
-        cardLayout.show(mainPanel, "group_" + groupName);
+        mainPanel.add(groupPanel, "group");
+        cardLayout.show(mainPanel, "group");
     }
 
-    private void showCreateGroupDialog() {
-        JDialog dialog = new JDialog(this, "Create New Group", true);
-        dialog.setSize(350, 300);
-        dialog.setLocationRelativeTo(this);
-        dialog.setLayout(new BorderLayout());
-
-        JPanel panel = new JPanel();
-        panel.setLayout(new GridLayout(4, 1, 10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        JLabel nameLabel = new JLabel("Group Name:");
-        JTextField nameField = new JTextField();
-
-        JLabel countLabel = new JLabel("Number of People:");
-        JTextField countField = new JTextField();
-
-        panel.add(nameLabel);
-        panel.add(nameField);
-        panel.add(countLabel);
-        panel.add(countField);
-
-        JPanel namesPanel = new JPanel();
-        namesPanel.setLayout(new BoxLayout(namesPanel, BoxLayout.Y_AXIS));
-        JScrollPane scrollPane = new JScrollPane(namesPanel);
-        scrollPane.setPreferredSize(new Dimension(300, 150));
-
-        JButton nextButton = new JButton("Next");
-        nextButton.addActionListener(e -> {
-            String groupName = nameField.getText().trim();
-            String countText = countField.getText().trim();
-
-            if (groupName.isEmpty()) {
-                JOptionPane.showMessageDialog(dialog, 
-                    "Group name cannot be empty!", 
-                    "Error", 
-                    JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            int numPeople;
-            try {
-                numPeople = Integer.parseInt(countText);
-                if (numPeople <= 1) {
-                    throw new NumberFormatException();
-                }
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(dialog, 
-                    "Please enter a valid number (2 or more)!", 
-                    "Error", 
-                    JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            namesPanel.removeAll();
-            for (int i = 0; i < numPeople; i++) {
-                JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-                rowPanel.add(new JLabel("Person " + (i + 1) + ":"));
-                rowPanel.add(new JTextField(15));
-                namesPanel.add(rowPanel);
-            }
-
-            namesPanel.revalidate();
-            namesPanel.repaint();
-            dialog.getContentPane().remove(panel);
-            dialog.getContentPane().add(scrollPane, BorderLayout.CENTER);
-            dialog.getContentPane().add(createDialogButtonPanel(dialog, nameField, namesPanel), BorderLayout.SOUTH);
-            dialog.pack();
-        });
-
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        buttonPanel.add(nextButton);
-
-        dialog.getContentPane().add(panel, BorderLayout.CENTER);
-        dialog.getContentPane().add(buttonPanel, BorderLayout.SOUTH);
-        dialog.setVisible(true);
-    }
-
-private JPanel createDialogButtonPanel(JDialog dialog, JTextField nameField, JPanel namesPanel) {
-    JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-
-    JButton createButton = new JButton("Create");
-    createButton.addActionListener(e -> {
-        String groupName = nameField.getText().trim();
-        if (groupName.isEmpty()) {
-            JOptionPane.showMessageDialog(dialog, "Please enter a group name", "Error", JOptionPane.ERROR_MESSAGE);
+    // Pop up window when pressed "Add New Expense"
+    private void showCreateExpenseDialog() {
+        if (group == null) {
+            showCreateGroupDialog(); // Fallback to creation if no group exists
             return;
         }
 
-        // Collect member names and check for duplicates
-        List<String> members = new ArrayList<>();
-        Set<String> uniqueNames = new HashSet<>(); // To track unique names
-        for (Component comp : namesPanel.getComponents()) {
-            if (comp instanceof JPanel) {
-                JPanel rowPanel = (JPanel) comp;
-                for (Component fieldComp : rowPanel.getComponents()) {
-                    if (fieldComp instanceof JTextField) {
-                        String name = ((JTextField) fieldComp).getText().trim();
-                        if (!name.isEmpty()) {
-                            if (!uniqueNames.add(name)) { // Duplicate found
-                                JOptionPane.showMessageDialog(dialog, 
-                                    "Duplicate name detected: '" + name + "'. Names must be unique.", 
-                                    "Error", 
-                                    JOptionPane.ERROR_MESSAGE);
-                                return;
-                            }
-                            members.add(name);
-                        }
-                    }
-                }
-            }
-        }
-
-        if (members.size() < 2) {
-            JOptionPane.showMessageDialog(dialog, "Group must have at least 2 members", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        groups.put(groupName, new Group(groupName, members));
-        updateGroupsList();
-        dialog.dispose();
-    });
-
-    JButton cancelButton = new JButton("Cancel");
-    cancelButton.addActionListener(e -> dialog.dispose());
-
-    buttonPanel.add(cancelButton);
-    buttonPanel.add(createButton);
-
-    return buttonPanel;
-}
-
-    private void showCreateExpenseDialog(Group group) {
         JDialog dialog = new JDialog(this, "Add New Expense", true);
         dialog.setSize(400, 400);
         dialog.setLocationRelativeTo(this);
@@ -428,7 +384,7 @@ private JPanel createDialogButtonPanel(JDialog dialog, JTextField nameField, JPa
             group.getExpenseManager().addExpense(expenseName, amount, payer);
             JOptionPane.showMessageDialog(dialog, "Expense added successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
             dialog.dispose();
-            showGroupDetails(group.getName()); // Refresh group details
+            showGroupDetails(); // Refresh group details
         });
 
         JButton cancelButton = new JButton("Cancel");
@@ -443,6 +399,7 @@ private JPanel createDialogButtonPanel(JDialog dialog, JTextField nameField, JPa
         dialog.setVisible(true);
     }
 
+    // Button appearance
     private void styleButton(JButton button) {
         button.setFont(new Font("Arial", Font.PLAIN, 18));
         button.setBackground(new Color(70, 130, 180));
