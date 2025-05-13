@@ -1,17 +1,14 @@
 package SplitterApp;
 
-//It manages the list of roommate and the total amount of money for each group 
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class ExpenseManager {
-    private List<Roommate> roommates; // List of roommate
-    private List<Expense> expenses; // List of how much money everyone owes
-    private int nextRoommateId; // Counting how many roommate
-    private int nextExpenseId; // Counting 
+    private List<Roommate> roommates; // List of roommates
+    private List<Expense> expenses; // List of expenses
+    private int nextRoommateId; // Counter for roommate IDs
+    private int nextExpenseId; // Counter for expense IDs
 
-    
     public ExpenseManager() {
         this.roommates = new ArrayList<>();
         this.expenses = new ArrayList<>();
@@ -19,7 +16,7 @@ public class ExpenseManager {
         this.nextExpenseId = 1;
     }
 
-    // Add roommate name in the list 
+    // Add roommate name to the list 
     public Roommate addRoommate(String name) {
         Roommate roommate = new Roommate(nextRoommateId++, name);
         roommates.add(roommate);
@@ -36,7 +33,7 @@ public class ExpenseManager {
         return expense;
     }
 
-    // Get the list of expense
+    // Get the list of expenses
     public List<Expense> getExpenses() {
         return new ArrayList<>(expenses);
     }
@@ -46,16 +43,23 @@ public class ExpenseManager {
         return new ArrayList<>(roommates);
     }
 
-    // Calculate how much each roommate need to pay the payer
+    // Calculate how much each roommate needs to pay the payer
     public List<Split> calculateSplits() {
         return SplitCalculator.calculateSplits(roommates, expenses);
     }
 
-    // Search roommate name 
+    // Search roommate by name 
     public Roommate findRoommateByName(String name) {
         return roommates.stream()
                 .filter(r -> r.getName().equalsIgnoreCase(name))
                 .findFirst()
                 .orElse(null);
+    }
+
+    // Set the next expense ID (used when loading expenses to avoid ID conflicts)
+    public void setNextExpenseId(int id) {
+        if (id >= nextExpenseId) {
+            nextExpenseId = id + 1;
+        }
     }
 }

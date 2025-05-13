@@ -2,6 +2,7 @@ package SplitterApp;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
 import java.util.*;
 import java.util.List;
 
@@ -19,6 +20,8 @@ public class SplitterAppGui extends JFrame {
     private CardLayout cardLayout;
     private JPanel mainPanel;
     private Group group; // Single group instance
+    private DatabaseManager dbManager; // Database manager for file operations
+    private List<Group> groups; // List to store all groups
 
     public SplitterAppGui() {
         super("Roommate Splitter Expense App");
@@ -27,14 +30,30 @@ public class SplitterAppGui extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
 
+        dbManager = new DatabaseManager();
+        groups = new ArrayList<>();
+        try {
+            groups = dbManager.loadGroups();
+            dbManager.loadExpenses(groups);
+            // Set the last group as the active group if groups exist
+            if (!groups.isEmpty()) {
+                group = groups.get(groups.size() - 1);
+            }
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Error loading data: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
-        group = null; // No group initially
+        // No group initially if groups.txt is empty
 
         mainPanel.add(createStartPanel(), "start");
 
         setContentPane(mainPanel);
         cardLayout.show(mainPanel, "start");
+
+        // Ensure UI rendering is complete
+        SwingUtilities.invokeLater(() -> revalidate());
     }
 
     // First page where it shows a funny quote and a button to go to the group creation dialog
@@ -42,25 +61,31 @@ public class SplitterAppGui extends JFrame {
         JPanel startPanel = new JPanel();
         startPanel.setLayout(null);
         startPanel.setBackground(Color.BLACK);
-    
+
         // Random quote label
         Random random = new Random();
         String randomQuote = QUOTES[random.nextInt(QUOTES.length)];
-        JLabel quoteLabel = new JLabel("<html><center>" + randomQuote + "</center></html>");
+        JLabel quoteLabel = new JLabel("<html><div style='text-align: center;'>" + randomQuote + "</div></html>");
         quoteLabel.setFont(new Font("Arial", Font.BOLD, 20));
         quoteLabel.setForeground(Color.WHITE);
-        quoteLabel.setBounds(190, 300, 300, 100); 
-        startPanel.add(quoteLabel, BorderLayout.CENTER);
+        quoteLabel.setBounds(100, 250, 500, 50); 
+        startPanel.add(quoteLabel,BorderLayout.CENTER);
 
         JButton letsGoButton = new JButton("Let's Go!");
         letsGoButton.setFont(new Font("Arial", Font.PLAIN, 18));
         letsGoButton.setBackground(new Color(50, 205, 50));
         letsGoButton.setForeground(Color.BLACK);
         letsGoButton.setFocusPainted(false);
-        letsGoButton.setBounds(290, 400, 100, 50); 
-        letsGoButton.addActionListener(e -> showCreateGroupDialog());
+        letsGoButton.setBounds(290, 450, 100, 50); // Adjusted y to 450 to avoid overlap
+        letsGoButton.addActionListener(e -> {
+            if (group != null) {
+                showGroupDetails(); // Show last used group if groups.txt is not empty
+            } else {
+                showCreateGroupDialog(); // Show create group dialog if no groups exist
+            }
+        });
         startPanel.add(letsGoButton);
-    
+
         return startPanel;
     }
 
@@ -129,7 +154,7 @@ public class SplitterAppGui extends JFrame {
             List<String> existingMembers = (group != null) ? group.getMembers() : new ArrayList<>();
             for (int i = 0; i < numPeople; i++) {
                 JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-                rowPanel.add(new JLabel("Person " + (i + 1) + ":"));
+                rowPanel.add(new JLabel("Roommate " + (i + 1) + ":"));
                 JTextField nameTextField = new JTextField(15);
                 // Pre-fill existing member names if available
                 if (i < existingMembers.size()) {
@@ -141,6 +166,7 @@ public class SplitterAppGui extends JFrame {
 
             namesPanel.revalidate();
             namesPanel.repaint();
+            
             dialog.getContentPane().remove(panel);
             dialog.getContentPane().add(scrollPane, BorderLayout.CENTER);
             dialog.getContentPane().add(createDialogButtonPanel(dialog, nameField, namesPanel), BorderLayout.SOUTH);
@@ -148,6 +174,9 @@ public class SplitterAppGui extends JFrame {
         });
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> dialog.dispose());
+        buttonPanel.add(cancelButton);
         buttonPanel.add(nextButton); 
 
         dialog.getContentPane().add(panel, BorderLayout.CENTER);
@@ -199,12 +228,22 @@ public class SplitterAppGui extends JFrame {
             // Preserve expenses if editing
             List<Expense> existingExpenses = (group != null) ? group.getExpenseManager().getExpenses() : new ArrayList<>();
             group = new Group(groupName, members); // Create or update group
+            groups.removeIf(g -> g.getName().equals(groupName)); // Remove old group if updating
+            groups.add(group); // Add new/updated group
             // Re-add existing expenses to the new ExpenseManager
             for (Expense expense : existingExpenses) {
                 Roommate payer = group.getExpenseManager().findRoommateByName(expense.getPayer().getName());
                 if (payer != null) {
                     group.getExpenseManager().addExpense(expense.getDescription(), expense.getAmount(), payer);
                 }
+            }
+
+            // Save groups to file
+            try {
+                dbManager.saveGroups(groups);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(dialog, "Error saving group: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                return;
             }
 
             dialog.dispose();
@@ -223,7 +262,7 @@ public class SplitterAppGui extends JFrame {
     // Group details such as who owes or owed who, how much does each need to pay etc.
     private void showGroupDetails() {
         if (group == null) {
-            showCreateGroupDialog(); // Fallback to creation if no group exists
+            showCreateGroupDialog();
             return;
         }
 
@@ -242,13 +281,13 @@ public class SplitterAppGui extends JFrame {
 
         // Expenses list
         JPanel expensesPanel = new JPanel();
-        expensesPanel.setLayout(new BoxLayout(expensesPanel, BoxLayout.Y_AXIS)); 
+        expensesPanel.setLayout(new BoxLayout(expensesPanel, BoxLayout.Y_AXIS));
         expensesPanel.setBackground(Color.BLACK);
 
         JLabel expensesLabel = new JLabel("Expenses");
         expensesLabel.setFont(new Font("Arial", Font.BOLD, 18));
         expensesLabel.setForeground(Color.WHITE);
-        expensesLabel.setAlignmentX(Component.CENTER_ALIGNMENT); 
+        expensesLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         expensesPanel.add(expensesLabel);
 
         List<Expense> expenses = group.getExpenseManager().getExpenses();
@@ -256,11 +295,12 @@ public class SplitterAppGui extends JFrame {
             JLabel noExpensesLabel = new JLabel("No expenses yet.");
             noExpensesLabel.setFont(new Font("Arial", Font.PLAIN, 16));
             noExpensesLabel.setForeground(Color.WHITE);
-            noExpensesLabel.setAlignmentX(Component.CENTER_ALIGNMENT); 
+            noExpensesLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
             expensesPanel.add(noExpensesLabel);
         } else {
             for (Expense expense : expenses) {
                 JLabel expenseLabel = new JLabel(
+                    "Date: " + expense.getDate().toString() + ", " +
                     expense.getDescription() + ": $" + String.format("%.2f", expense.getAmount()) +
                     " (Paid by " + expense.getPayer().getName() + ")"
                 );
@@ -326,7 +366,7 @@ public class SplitterAppGui extends JFrame {
     // Pop up window when pressed "Add New Expense"
     private void showCreateExpenseDialog() {
         if (group == null) {
-            showCreateGroupDialog(); // Fallback to creation if no group exists
+            showCreateGroupDialog();
             return;
         }
 
@@ -346,7 +386,10 @@ public class SplitterAppGui extends JFrame {
         JTextField amountField = new JTextField();
 
         JLabel payerLabel = new JLabel("Paid By:");
-        JComboBox<String> payerComboBox = new JComboBox<>(group.getMembers().toArray(new String[0]));
+        JComboBox<String> payerComboBox = new JComboBox<>();
+        for (Roommate roommate : group.getExpenseManager().getRoommates()) {
+            payerComboBox.addItem(roommate.getName());
+        }
 
         panel.add(nameLabel);
         panel.add(nameField);
@@ -355,7 +398,11 @@ public class SplitterAppGui extends JFrame {
         panel.add(payerLabel);
         panel.add(payerComboBox);
 
-        JButton createButton = new JButton("Add Expense");
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        JButton createButton = new JButton("Create");
         createButton.addActionListener(e -> {
             String expenseName = nameField.getText().trim();
             if (expenseName.isEmpty()) {
@@ -367,30 +414,33 @@ public class SplitterAppGui extends JFrame {
             try {
                 amount = Double.parseDouble(amountField.getText().trim());
                 if (amount <= 0) {
-                    throw new NumberFormatException();
+                    JOptionPane.showMessageDialog(dialog, "Amount must be positive", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
                 }
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(dialog, "Please enter a valid positive amount", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(dialog, "Please enter a valid amount", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
             String payerName = (String) payerComboBox.getSelectedItem();
             Roommate payer = group.getExpenseManager().findRoommateByName(payerName);
             if (payer == null) {
-                JOptionPane.showMessageDialog(dialog, "Invalid payer selected", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(dialog, "Please select a valid payer", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
             group.getExpenseManager().addExpense(expenseName, amount, payer);
-            JOptionPane.showMessageDialog(dialog, "Expense added successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            try {
+                dbManager.saveExpenses(group);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(dialog, "Error saving expense: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
             dialog.dispose();
-            showGroupDetails(); // Refresh group details
+            showGroupDetails();
         });
 
-        JButton cancelButton = new JButton("Cancel");
-        cancelButton.addActionListener(e -> dialog.dispose());
-
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         buttonPanel.add(cancelButton);
         buttonPanel.add(createButton);
 
